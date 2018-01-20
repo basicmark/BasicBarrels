@@ -629,7 +629,7 @@ public class BasicBarrels extends JavaPlugin implements Listener {
 			Boolean barrelEmpty = true;
 
 			/* Fast check, are we empty? */
-			if (barrelItem.getItemMeta().getDisplayName() != empty.getItemMeta().getDisplayName()) {
+			if (!barrelItem.getItemMeta().getDisplayName().equals(empty.getItemMeta().getDisplayName())) {
 				barrelEmpty = false;
 			}
 
@@ -728,7 +728,7 @@ public class BasicBarrels extends JavaPlugin implements Listener {
 			}
 			
 			/* Fast check, are we empty? */
-			if (barrelItem.getItemMeta().getDisplayName() == empty.getItemMeta().getDisplayName()) {
+			if (barrelItem.getItemMeta().getDisplayName().equals(empty.getItemMeta().getDisplayName())) {
 				return;
 			}
 			Integer amount = Integer.parseInt(loreText.get(amountOffset));
