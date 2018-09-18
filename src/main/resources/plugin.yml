@@ -2,19 +2,43 @@ name: BasicBarrels
 author: basicmark
 description: Storage Barrels
 main: io.github.basicmark.basicbarrels.BasicBarrels
-startup: postworld
+startup: preworld
 url: https://github.com/basicmark/BasicBarrels
-depend: []
+depend: [ExtendMinecraft]
 softdepend: []
-version: 1.0
+version: 1.1
 commands:
     barrel:
-        description: Type /barrel ? for more info
-        usage: /barrel ?
+        description: Type /managers ? for more info
+        usage: /managers ?
 permissions:
-    barrel.use:
-        description: Create, add items to, remove items from, unlock and break your own barrels
-        default: false
-    barrel.mod.use_others:
-        description: Add items to, remove items from, unlock and break other players barrels
-        default: false
+    barrel.player.craft:
+        description: Permission node which controls if crafting of a managers is allowed.
+        default: true
+    barrel.player.place:
+        description: Permission node which controls if placing of a managers is allowed.
+        default: true
+    barrel.player.break:
+        description: Permission node which controls if breaking of a managers is allowed.
+        default: true
+    barrel.player.use:
+        description: Permission node which controls if adding/removing items to/from a managers is allowed.
+        default: true
+    barrel.player.lock:
+        description: Permission node which controls if locking of a managers is allowed. Note that this doesn't include automatic locking if enabled.
+        default: true
+    barrel.player.unlock:
+        description: Permission node which controls if unlocking of a managers is allowed.
+        default: true
+    barrel.player.info:
+        description: Permission node which controls if use of the info command is allowed.
+        default: true
+    barrel.mod.lockbypass:
+        description: Permission node which controls if user can bypass locking.
+        default: op
+    barrel.admin.reload:
+        description: Permission node which controls if user can reload plugin settings.
+        default: op
+    barrel.admin.debug:
+        description: Permission node which controls if use of the debug command is allowed.
+        default: op

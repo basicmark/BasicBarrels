@@ -4,7 +4,7 @@
 
 	<groupId>io.github.basicmark.plugin</groupId>
 	<artifactId>BasicBarrels</artifactId>
-	<version>1.0</version>
+	<version>1.1</version>
 	<packaging>jar</packaging>
 	<url>https://github.com/basicmark/BasicBarrels</url>
 
@@ -44,6 +44,13 @@
 			<scope>compile</scope>
 			<type>jar</type>
 		</dependency>
+		<dependency>
+			<groupId>io.github.basicmark.plugin</groupId>
+			<artifactId>ExtendMinecraft</artifactId>
+			<version>1.1</version>
+			<scope>compile</scope>
+			<type>jar</type>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -57,8 +64,7 @@
 				<filtering>true</filtering>
 				<directory>${basedir}/src/main/resources/</directory>
 				<includes>
-					<include>plugin.yml</include>
-					<include>config.yml</include>
+					<include>*.yml</include>
 				</includes>
 			</resource>
 		</resources>
