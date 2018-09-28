@@ -2,25 +2,19 @@ package io.github.basicmark.basicbarrels.block;
 
 import io.github.basicmark.basicbarrels.BarrelException;
 import io.github.basicmark.basicbarrels.BasicBarrels;
-import io.github.basicmark.basicbarrels.managers.BarrelConduitManager;
 import io.github.basicmark.basicbarrels.managers.BarrelControllerManager;
-import io.github.basicmark.basicbarrels.managers.BarrelManager;
-import io.github.basicmark.extendminecraft.block.ExtendBlock;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.material.MaterialData;
-import org.bukkit.metadata.FixedMetadataValue;
-import org.bukkit.metadata.MetadataValue;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
 
@@ -40,12 +34,10 @@ public class BarrelController extends BarrelConduit {
     public static final int typeOffset = 1;
     public static final String itemStackLoreName = "Barrel Controller";
 
-    final int scanDepth = 6;
-
     final static Set<BlockFace> connectableFaces = new HashSet<BlockFace>();
     final static Set<BlockFace> inputFaces = new HashSet<BlockFace>();
-    //private Map<Material, Set<Barrel>> barrels = new HashMap<Material, Set<Barrel>>();
     private Set<Barrel> barrels = new HashSet<Barrel>();
+    private BukkitTask clearHighlight = null;
 
     static {
         connectableFaces.add(BlockFace.NORTH);
@@ -78,7 +70,6 @@ public class BarrelController extends BarrelConduit {
 
     @Override
     public void postChunkLoad(){
-        Bukkit.getLogger().info("postChunkLoad");
         this.conduitScan();
     }
 
@@ -87,10 +78,11 @@ public class BarrelController extends BarrelConduit {
     }
 
     public void removeBarrelController() {
-        Bukkit.getLogger().info("removeBarrelController");
-
-        for (Barrel barrel : barrels) {
-            barrel.setHighlight(false);
+        if (clearHighlight != null) {
+            clearHighlight.cancel();
+            for (Barrel barrel : barrels) {
+                barrel.setHighlight(false);
+            }
         }
         BarrelControllerManager manager = BasicBarrels.getBarrelControllerManager();
         manager.unregisterController(this);
@@ -125,25 +117,13 @@ public class BarrelController extends BarrelConduit {
         BarrelControllerManager manager = BasicBarrels.getBarrelControllerManager();
         manager.unregisterController(this);
     }
-/*
-    public void unloadBarrelController() {
-        BasicBarrels.logEvent(barrelControllerLogPrefix() + ": Barrel controller unloaded");
-        removeBarrelController();
-    }
 
-    public void breakBarrelController(Player player) {
-        BasicBarrels.logEvent(barrelControllerLogPrefix() + ": Barrel controller broken");
-        removeBarrelController();
-    }
-*/
     private void addBarrel(Barrel barrel) {
         barrels.add(barrel);
-        barrel.setHighlight(true);
     }
 
     private void removeBarrel(Barrel barrel) {
         barrels.remove(barrel);
-        barrel.setHighlight(false);
     }
 
 
@@ -189,6 +169,27 @@ public class BarrelController extends BarrelConduit {
         return barrelList;
     }
 
+    public void showConnectedBarrels() {
+        if (clearHighlight != null) {
+            /* Highlight already in progress */
+            return;
+        }
+
+        for (Barrel barrel : barrels) {
+            barrel.setHighlight(true);
+        }
+        final Plugin plugin = BarrelControllerManager.plugin;
+        clearHighlight = new BukkitRunnable() {
+            @Override
+            public void run() {
+                for (Barrel barrel : barrels) {
+                    barrel.setHighlight(false);
+                }
+                clearHighlight = null;
+            }
+        }.runTaskLater(plugin, 20 * 10);
+    }
+
     public void addItems(Inventory inventory, int firstSlot, int lastSlot, int addAmount) {
         /*
             Create a uniqueList itemstacks (material + data) from the inventory
@@ -204,8 +205,6 @@ public class BarrelController extends BarrelConduit {
                         If not full
                             break
          */
-
-        Bukkit.getLogger().info("addItems");
 
         for (int slot = firstSlot; slot <= lastSlot; slot++) {
             ItemStack itemStack = inventory.getItem(slot);
@@ -223,13 +222,11 @@ public class BarrelController extends BarrelConduit {
                 If there are still more items after this then add the remaining
                 items to empty barrels.
              */
-            Bukkit.getLogger().info("Slot: " + slot + " is storable (" + itemStack.getType().name() + ":" + itemStack.getData().getData());
             Set<Barrel> barrelList = findBarrels(itemStack);
-            Bukkit.getLogger().info("Matching barrels: " + barrelList.size());
             boolean full = true;
             for (Barrel barrel : barrelList) {
                 try {
-                    full = barrel.addItemsFromInventory(inventory, firstSlot, lastSlot, addAmount);
+                    full = barrel.addItemsFromInventory(inventory, slot, lastSlot, addAmount);
                 }
                 catch (BarrelException e) {
                 }
@@ -240,10 +237,9 @@ public class BarrelController extends BarrelConduit {
 
             if (full) {
                 barrelList = emptyBarrels();
-                Bukkit.getLogger().info("Empty barrels: " + barrelList.size());
                 for (Barrel barrel : barrelList) {
                     try {
-                        full = barrel.addItemsFromInventory(inventory, firstSlot, lastSlot, addAmount);
+                        full = barrel.addItemsFromInventory(inventory, slot, lastSlot, addAmount);
                     }
                     catch (BarrelException e) {
                     }
@@ -267,7 +263,6 @@ public class BarrelController extends BarrelConduit {
             Block conBlock = getBukkitBlock().getRelative(face);
             BlockState blockState = conBlock.getState();
             if (blockState instanceof InventoryHolder) {
-                boolean updated = false;
                 InventoryHolder holder = (InventoryHolder) blockState;
                 Inventory inventory = holder.getInventory();
                 int size = inventory.getSize();
@@ -279,21 +274,16 @@ public class BarrelController extends BarrelConduit {
                     }
 
                     int amount = item.getAmount();
-                    addItems(inventory, 0, size - 1, item.getMaxStackSize());
-
+                    addItems(inventory, slot, slot, 1);
                     /* Check for remaining items in the slot, if not stop checking compatible barrels */
                     item = inventory.getItem(slot);
+
                     if ((item == null) || (item.getType() == Material.AIR) || item.getAmount() != amount) {
                         /* The itemStack in the slot has be processed so stop further processing */
-                        updated = true;
                         break;
                     }
-                }
-                if (updated) {
-                    blockState.update();
                 }
             }
         }
     }
-
 }

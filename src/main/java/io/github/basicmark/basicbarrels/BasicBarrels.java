@@ -10,9 +10,7 @@ import io.github.basicmark.basicbarrels.managers.BarrelConduitManager;
 import io.github.basicmark.basicbarrels.managers.BarrelManager;
 import io.github.basicmark.basicbarrels.managers.BarrelControllerManager;
 import io.github.basicmark.extendminecraft.ExtendMinecraft;
-import io.github.basicmark.extendminecraft.block.ExtendBlock;
 import io.github.basicmark.extendminecraft.block.ExtendBlockFactory;
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
@@ -34,6 +32,7 @@ public class BasicBarrels extends JavaPlugin {
     private static BarrelManager barrelManager;
     private static BarrelControllerManager controllerManager;
     private static ExtendMinecraft extendMinecraft;
+    private static BasicBarrels instance = null;
 
     private Set<ExtendBlockFactory> factories = new HashSet<ExtendBlockFactory>();
 	private YamlConfiguration languageConfig;
@@ -41,7 +40,7 @@ public class BasicBarrels extends JavaPlugin {
 	private void loadConfig() {
 		FileConfiguration config = getConfig();
 
-		//manager.setDefaultLocking(config.getBoolean("lockonplace", true));
+        BarrelManager.setDefaultLocking(config.getBoolean("lockonplace", true));
 		logEnabled = config.getBoolean("enablelogging", true);
 		List<String> matStrList = config.getStringList("blacklist");
 
@@ -74,16 +73,22 @@ public class BasicBarrels extends JavaPlugin {
         if (defaultConfigStream != null)
         {
             YamlConfiguration defaultConfig = YamlConfiguration.loadConfiguration(defaultConfigStream); /* Load defaults */
-            getLogger().info("Loaded defaults:" + defaultConfig.saveToString());
             languageConfig.setDefaults(defaultConfig); /* Set defaults */
             languageConfig.options().copyDefaults(true);
         }
 
         try {
-            getLogger().info("Saving:" + languageConfig.saveToString());
             languageConfig.save(languageFile);
         } catch (IOException e) {
             getLogger().severe("Failed to save language file");
+        }
+
+        /* Reload as this seems to be required if defaults are used to update the config */
+        languageConfig = new YamlConfiguration();
+        try {
+            languageConfig.load(languageFile);
+        } catch (Exception e) {
+            getLogger().info("Failed to load language file after applying defaults");
         }
 	}
 
@@ -119,6 +124,7 @@ public class BasicBarrels extends JavaPlugin {
 	}
 
 	public void onEnable(){
+        instance = this;
         extendMinecraft = (ExtendMinecraft) getServer().getPluginManager().getPlugin("ExtendMinecraft");
         if (extendMinecraft == null) {
             getLogger().severe("Failed to find ExtendMinecraft plugin");
@@ -136,10 +142,6 @@ public class BasicBarrels extends JavaPlugin {
         factories.add(new BarrelControllerFactory());
         factories.add(new BarrelConduitFactory());
 
-        for (ExtendBlockFactory factory : factories) {
-            extendMinecraft.blockRegistry.add(factory);
-        }
-
 		if (logEnabled) {
 			startLogger();
 		}
@@ -149,13 +151,22 @@ public class BasicBarrels extends JavaPlugin {
 		} else {
 			getLogger().info("Logger disabled");
 		}
+
+		/*
+		 * Registering the blocks must happen last as the factories might be used during
+		 * registration where chunks (e.g. spawn chunks) already contain ExtendBlock
+		 * which belong to our plugin.
+		 */
+        for (ExtendBlockFactory factory : factories) {
+            ExtendMinecraft.blockRegistry.add(factory);
+        }
 	}
 
 	public void onDisable(){
         controllerManager.shutdown();
 
         for (ExtendBlockFactory factory : factories) {
-            extendMinecraft.blockRegistry.remove(factory);
+            ExtendMinecraft.blockRegistry.remove(factory);
         }
 		if (logEnabled) {
 			try {
@@ -176,28 +187,31 @@ public class BasicBarrels extends JavaPlugin {
     }
 
 	public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-		if (cmd.getName().equalsIgnoreCase("managers")){
-			if ((args.length == 1) && args[0].equals("?")) {
+		if (cmd.getName().equalsIgnoreCase("barrel")){
+			if ((args.length == 1) && (args[0].equals("?") || args[0].equals("help"))) {
                 sender.sendMessage(translateMessage("HELP_TITLE1"));
                 sender.sendMessage(translateMessage("HELP_TITLE2"));
-                if (sender.hasPermission("managers.player.unlock")) {
+                if (sender.hasPermission("barrel.player.unlock")) {
                     sender.sendMessage(translateMessage("HELP_UNLOCK"));
                 }
-                if (sender.hasPermission("managers.player.lock")) {
+                if (sender.hasPermission("barrel.player.lock")) {
                     sender.sendMessage(translateMessage("HELP_LOCK"));
                 }
-                if (sender.hasPermission("managers.player.info")) {
+                if (sender.hasPermission("barrel.player.info")) {
                     sender.sendMessage(translateMessage("HELP_INFO"));
                 }
-                if (sender.hasPermission("managers.admin.reload")) {
+                if (sender.hasPermission("barrel.player.connected")) {
+                    sender.sendMessage(translateMessage("HELP_CONNECTED"));
+                }
+                if (sender.hasPermission("barrel.admin.reload")) {
                     sender.sendMessage(translateMessage("HELP_RELOAD"));
                 }
-                if (sender.hasPermission("managers.admin.debug")) {
+                if (sender.hasPermission("barrel.admin.debug")) {
                     sender.sendMessage(translateMessage("HELP_DEBUG"));
                 }
 				return true;
 			} else if ((args.length == 1) && args[0].equals("unlock")) {
-                if (!sender.hasPermission("managers.player.unlock")) {
+                if (!sender.hasPermission("barrel.player.unlock")) {
                     sender.sendMessage(translateMessage("COMMAND_PERMISSION_ERROR"));
                     return true;
                 }
@@ -210,7 +224,7 @@ public class BasicBarrels extends JavaPlugin {
                 sender.sendMessage(translateMessage("OPERATION_UNLOCK"));
 				return true;	
 			} else if ((args.length == 1) && args[0].equals("lock")) {
-                if (!sender.hasPermission("managers.player.lock")) {
+                if (!sender.hasPermission("barrel.player.lock")) {
                     sender.sendMessage(translateMessage("COMMAND_PERMISSION_ERROR"));
                     return true;
                 }
@@ -223,7 +237,7 @@ public class BasicBarrels extends JavaPlugin {
                 sender.sendMessage(translateMessage("OPERATION_LOCK"));
 				return true;	
 			} else if ((args.length == 1) && args[0].equals("info")) {
-                if (!sender.hasPermission("managers.player.info")) {
+                if (!sender.hasPermission("barrel.player.info")) {
                     sender.sendMessage(translateMessage("COMMAND_PERMISSION_ERROR"));
                     return true;
                 }
@@ -235,22 +249,35 @@ public class BasicBarrels extends JavaPlugin {
                 barrelManager.setPendingRequest(player, BarrelManager.BarrelOperation.INFO);
                 sender.sendMessage(translateMessage("OPERATION_INFO"));
                 return true;
+            } else if ((args.length == 1) && args[0].equals("connected")) {
+                if (!sender.hasPermission("barrel.player.connected")) {
+                    sender.sendMessage(translateMessage("COMMAND_PERMISSION_ERROR"));
+                    return true;
+                }
+
+                if (!(sender instanceof Player)) {
+                    sender.sendMessage(translateMessage("COMMAND_CONSOLE_SENDER_ERROR"));
+                    return true;
+                }
+                Player player = (Player) sender;
+                controllerManager.setPendingRequest(player, BarrelControllerManager.ControllerOperation.CONNECTED);
+                sender.sendMessage(translateMessage("CONTROLLER_OPERATION_INFO"));
+                return true;
             } else if ((args.length == 1) && args[0].equals("reload")) {
-                if (!sender.hasPermission("managers.admin.reload")) {
+                if (!sender.hasPermission("barrel.admin.reload")) {
                     sender.sendMessage(translateMessage("COMMAND_PERMISSION_ERROR"));
                     return true;
                 }
 
-				loadConfig();
+                loadConfig();
                 sender.sendMessage(translateMessage("CONFIG_RELOADED"));
-				return true;
+                return true;
             }  else if ((args.length == 1) && args[0].equals("debug")) {
-                if (!sender.hasPermission("managers.admin.debug")) {
+                if (!sender.hasPermission("barrel.admin.debug")) {
                     sender.sendMessage(translateMessage("COMMAND_PERMISSION_ERROR"));
                     return true;
                 }
 
-                //manager.debugInfo(sender);
                 return true;
             }
 		}
@@ -282,7 +309,10 @@ public class BasicBarrels extends JavaPlugin {
 				e.printStackTrace();
 			}
 		}
-		Bukkit.getServer().getLogger().info(event);
 	}
+
+	public static void logError(String error) {
+        instance.getLogger().severe(error);
+    }
 }
 

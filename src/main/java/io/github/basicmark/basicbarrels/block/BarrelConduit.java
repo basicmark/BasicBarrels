@@ -3,9 +3,6 @@ package io.github.basicmark.basicbarrels.block;
 import io.github.basicmark.basicbarrels.BasicBarrels;
 import io.github.basicmark.extendminecraft.ExtendMinecraft;
 import io.github.basicmark.extendminecraft.block.ExtendBlock;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.configuration.ConfigurationSection;
@@ -43,16 +40,13 @@ public class BarrelConduit extends ExtendBlock {
 
     public void setController() {
         isController = true;
-        level = 6;
+        level = 15;
         linkedController = (BarrelController) this;
     }
 
     private boolean linkController(BarrelController newController, int newLevel) {
-        Bukkit.getLogger().info("linkController(" + newController + "," + newLevel + ")");
-
         /* No change so return */
         if ((newLevel == level) && (newController == linkedController)) {
-            Bukkit.getLogger().info("No change");
             return false;
         }
 
@@ -69,12 +63,10 @@ public class BarrelConduit extends ExtendBlock {
         /* Remove the existing link if there is a change in controller */
         if (oldController != newController) {
             if (oldController != null) {
-                Bukkit.getLogger().info("Remove from old controller");
                 oldController.remove(this);
             }
             if (newController != null) {
                 newController.add(this);
-                Bukkit.getLogger().info("Add to new controller");
             }
         }
 
@@ -123,8 +115,6 @@ public class BarrelConduit extends ExtendBlock {
         int oldLevel = getLevel();
         int curLevel = 0;
         Queue<BarrelConduit> adjConduits = new LinkedList<BarrelConduit>();
-        Bukkit.getLogger().info("conduitScan start (" + block.getX() + "," + block.getY() + "," + block.getZ() + ")" );
-        Bukkit.getLogger().info("level = " + getLevel());
 
         /* First find all adjacent conduits keeping track of the the highest level */
         for (BlockFace face : connectableFaces) {
@@ -132,7 +122,6 @@ public class BarrelConduit extends ExtendBlock {
             ExtendBlock extConBlock = extendMinecraft.getBlock(conBlock);
             if (extConBlock instanceof BarrelConduit) {
                 BarrelConduit adjConduit = (BarrelConduit) extConBlock;
-                Bukkit.getLogger().info("Found conduit on face " + face.name() + "with level " + adjConduit.getLevel());
                 if (adjConduit.getLevel() > 1) {
                     if (adjConduit.getLevel() > (curLevel - 1)) {
                         curController = adjConduit.getController();
@@ -180,16 +169,16 @@ public class BarrelConduit extends ExtendBlock {
 
     @Override
     public void save(ConfigurationSection config) {
-        //config.set("level", level);
-        //config.set("controllerChunkX", controllerChunkX);
-        //config.set("controllerChunkZ", controllerChunkZ);
+        /*
+         * The controller is a dynamic object and rather then assigned persistent
+         * UUIDs to them so they can be stored along with the connection level its
+         * recalculated on at load time (see the comment in postChunkLoad for more
+         * details.
+         */
     }
 
     @Override
     public void load(ConfigurationSection config) {
-       // level = config.getInt("level");
-        //controllerChunkX = config.getInt("controllerChunkX");
-        //controllerChunkZ = config.getInt("controllerChunkZ");
     }
 
     @Override

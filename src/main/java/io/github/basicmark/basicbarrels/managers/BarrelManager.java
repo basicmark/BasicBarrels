@@ -11,7 +11,6 @@ import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.ShulkerBox;
-import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -31,43 +30,38 @@ import java.util.*;
 
 public class BarrelManager implements Listener {
     /* TODO move to common class */
-    public static EnumSet<Material> shulkerBoxes = EnumSet.of(Material.BLACK_SHULKER_BOX, Material.SILVER_SHULKER_BOX,
+    public static EnumSet<Material> shulkerBoxes = EnumSet.of(Material.BLACK_SHULKER_BOX, Material.SHULKER_BOX,
             Material.BROWN_SHULKER_BOX, Material.CYAN_SHULKER_BOX,
             Material.GRAY_SHULKER_BOX,Material.GREEN_SHULKER_BOX,
             Material.LIGHT_BLUE_SHULKER_BOX, Material.LIME_SHULKER_BOX,
             Material.MAGENTA_SHULKER_BOX, Material.ORANGE_SHULKER_BOX,
             Material.PINK_SHULKER_BOX, Material.PURPLE_SHULKER_BOX,
             Material.RED_SHULKER_BOX, Material.WHITE_SHULKER_BOX,
-            Material.YELLOW_SHULKER_BOX);
+            Material.YELLOW_SHULKER_BOX, Material.BLUE_SHULKER_BOX);
     private static final BlockFace[] faces = {BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST};
 
     public static BasicBarrels plugin = null;
-    private Boolean defaultLocking;
-    private Set<Recipe> recipes;
-    private Map<Player, BarrelOperation> playerOperation;
+    private static Boolean defaultLocking = true;
+    private Set<Recipe> recipes = new HashSet<Recipe>();
+    private Map<Player, BarrelOperation> playerOperation = new HashMap<Player, BarrelOperation>();;
 
     public BarrelManager(BasicBarrels barrelPlugin) {
         plugin = barrelPlugin;
-        defaultLocking = true;
-        playerOperation = new HashMap<Player, BarrelOperation>();
 
         /* Register the different types of barrels that can be crafted */
-        recipes = new HashSet<Recipe>();
         for (BarrelType barrel : Barrel.barrelSet) {
             Integer dataTypeIndex = 0;
             for (Material log : Barrel.logTypeSet) {
-                for (byte dataValue = 0; dataValue < Barrel.maxDataValue[dataTypeIndex]; dataValue++) {
-                    ItemStack item = Barrel.createItemStack(barrel, log, dataValue);
-                    ShapedRecipe recipe = new ShapedRecipe(item);
+                ItemStack item = Barrel.createItemStack(barrel, log);
+                ShapedRecipe recipe = new ShapedRecipe(item);
 
-                    recipe.shape("EME","MLM","EME");
-                    recipe.setIngredient('L', log, dataValue);
-                    recipe.setIngredient('M', barrel.getMaterial());
-                    recipe.setIngredient('E', Material.ENDER_PEARL);
+                recipe.shape("EME","MLM","EME");
+                recipe.setIngredient('L', log);
+                recipe.setIngredient('M', barrel.getMaterial());
+                recipe.setIngredient('E', Material.ENDER_PEARL);
 
-                    Bukkit.getServer().addRecipe(recipe);
-                    recipes.add(recipe);
-                }
+                Bukkit.getServer().addRecipe(recipe);
+                recipes.add(recipe);
             }
         }
 
@@ -94,7 +88,7 @@ public class BarrelManager implements Listener {
         playerOperation.put(player, operation);
     }
 
-    public void setDefaultLocking(boolean value) {
+    public static void setDefaultLocking(boolean value) {
         defaultLocking = value;
     }
 
@@ -126,7 +120,7 @@ public class BarrelManager implements Listener {
                     if (barrel.isLocked()) {
                         player.sendMessage(plugin.translateMessage("BARREL_INFO4", substitutes));
                     } else {
-                        player.sendMessage(plugin.translateMessage("BARREL_INFO4", substitutes));
+                        player.sendMessage(plugin.translateMessage("BARREL_INFO5", substitutes));
                     }
             }
             playerOperation.remove(player);

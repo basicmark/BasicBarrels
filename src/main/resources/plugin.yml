@@ -7,28 +7,29 @@ url: https://github.com/basicmark/BasicBarrels
 depend: [ExtendMinecraft]
 softdepend: []
 version: 1.1
+api-version: 1.13
 commands:
     barrel:
-        description: Type /managers ? for more info
-        usage: /managers ?
+        description: Type /barrel ? for more info
+        usage: /barrel ?
 permissions:
     barrel.player.craft:
-        description: Permission node which controls if crafting of a managers is allowed.
+        description: Permission node which controls if crafting of a barrel is allowed.
         default: true
     barrel.player.place:
-        description: Permission node which controls if placing of a managers is allowed.
+        description: Permission node which controls if placing of a barrel is allowed.
         default: true
     barrel.player.break:
-        description: Permission node which controls if breaking of a managers is allowed.
+        description: Permission node which controls if breaking of a barrel is allowed.
         default: true
     barrel.player.use:
-        description: Permission node which controls if adding/removing items to/from a managers is allowed.
+        description: Permission node which controls if adding/removing items to/from a barrel is allowed.
         default: true
     barrel.player.lock:
-        description: Permission node which controls if locking of a managers is allowed. Note that this doesn't include automatic locking if enabled.
+        description: Permission node which controls if locking of a barrel is allowed. Note that this doesn't include automatic locking if enabled.
         default: true
     barrel.player.unlock:
-        description: Permission node which controls if unlocking of a managers is allowed.
+        description: Permission node which controls if unlocking of a barrel is allowed.
         default: true
     barrel.player.info:
         description: Permission node which controls if use of the info command is allowed.

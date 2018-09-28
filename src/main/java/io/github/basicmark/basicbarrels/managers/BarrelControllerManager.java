@@ -2,15 +2,12 @@ package io.github.basicmark.basicbarrels.managers;
 
 import io.github.basicmark.basicbarrels.BarrelException;
 import io.github.basicmark.basicbarrels.BasicBarrels;
-import io.github.basicmark.basicbarrels.block.BarrelConduit;
 import io.github.basicmark.basicbarrels.block.BarrelController;
 import io.github.basicmark.basicbarrels.events.BasicBarrelBlockPlaceEvent;
 import io.github.basicmark.extendminecraft.ExtendMinecraft;
 import io.github.basicmark.extendminecraft.block.ExtendBlock;
 import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
 import org.bukkit.Material;
-import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.ShulkerBox;
 import org.bukkit.entity.Player;
@@ -20,8 +17,6 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.world.ChunkLoadEvent;
-import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
@@ -34,11 +29,12 @@ import org.bukkit.scheduler.BukkitTask;
 import java.util.*;
 
 public class BarrelControllerManager implements Listener {
-    static private BasicBarrels plugin;
+    static public BasicBarrels plugin;
     private ShapedRecipe recipe;
     private ItemStack controllerItem;
     Set<BarrelController> controllers = new HashSet<BarrelController>();
     BukkitTask tickerTask = null;
+    private Map<Player, ControllerOperation> playerOperation = new HashMap<Player, ControllerOperation>();;
 
     public BarrelControllerManager(BasicBarrels barrelPlugin) {
         this.plugin = barrelPlugin;
@@ -55,7 +51,7 @@ public class BarrelControllerManager implements Listener {
         recipe.shape("RQR","COC","RQR");
         recipe.setIngredient('R', Material.REDSTONE_BLOCK);
         recipe.setIngredient('Q', Material.QUARTZ);
-        recipe.setIngredient('C', Material.REDSTONE_COMPARATOR);
+        recipe.setIngredient('C', Material.COMPARATOR);
         recipe.setIngredient('O', Material.OBSERVER);
 
         Bukkit.getServer().addRecipe(recipe);
@@ -123,9 +119,11 @@ public class BarrelControllerManager implements Listener {
             tickerTask.cancel();
         }
     }
+    public void setPendingRequest(Player player, ControllerOperation operation) {
+        playerOperation.put(player, operation);
+    }
 
     public void registerController(BarrelController controller) {
-        Bukkit.getLogger().info("registerController");
         if (controllers.isEmpty()) {
             startTicker();
         }
@@ -133,12 +131,26 @@ public class BarrelControllerManager implements Listener {
     }
 
     public void unregisterController(BarrelController controller) {
-        Bukkit.getLogger().info("unregisterController");
         controllers.remove(controller);
 
         if (controllers.isEmpty()) {
             stopTicker();
         }
+    }
+
+    private boolean handlePendingRequest(BarrelController controller, Player player) {
+        /* Check if the player has a pending operation */
+        if (playerOperation.containsKey(player)) {
+            switch (playerOperation.get(player)) {
+                case CONNECTED:
+                    controller.showConnectedBarrels();
+                    player.sendMessage(plugin.translateMessage("CONTROLLER_BARRELS_HIGHLIGHTED"));
+                    break;
+            }
+            playerOperation.remove(player);
+            return true;
+        }
+        return false;
     }
 
     @EventHandler
@@ -173,6 +185,11 @@ public class BarrelControllerManager implements Listener {
         BarrelController controller = (BarrelController) extBlock;
         Player player = event.getPlayer();
 
+        event.setCancelled(true);
+        if (handlePendingRequest(controller, player)) {
+            return;
+        }
+
         /* Remove items from the player and add them to the barrel */
         if (BarrelManager.shulkerBoxes.contains(player.getInventory().getItemInMainHand().getType())) {
             ItemStack item = player.getInventory().getItemInMainHand();
@@ -193,5 +210,9 @@ public class BarrelControllerManager implements Listener {
                 controller.addItems(inventory, inventory.getHeldItemSlot(), inventory.getHeldItemSlot(), Integer.MAX_VALUE);
             }
         }
+    }
+
+    public enum ControllerOperation {
+        CONNECTED
     }
 }

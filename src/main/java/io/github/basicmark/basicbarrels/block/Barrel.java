@@ -9,11 +9,13 @@ import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
+import org.bukkit.block.data.Orientable;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.metadata.FixedMetadataValue;
@@ -39,8 +41,8 @@ public class Barrel extends BarrelConduit {
 
     public static final String metadataKey = "BasicBarrel";
     public static final EnumSet<BarrelType> barrelSet = EnumSet.allOf(BarrelType.class);
-    public static EnumSet<Material> logTypeSet = EnumSet.of(Material.LOG, Material.LOG_2);
-    public static Integer[] maxDataValue = { 4, 2 };
+    public static EnumSet<Material> logTypeSet = EnumSet.of(Material.ACACIA_LOG, Material.BIRCH_LOG, Material.DARK_OAK_LOG,
+            Material.JUNGLE_LOG, Material.OAK_LOG, Material.SPRUCE_LOG);
     private static final Set<Material> blacklist = new HashSet<Material>();
     private static final BlockFace[] faces = {BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST};
     private static ItemStack empty;
@@ -75,7 +77,7 @@ public class Barrel extends BarrelConduit {
         this.material = barrelItem.getType();
         this.blockData = barrelItem.getData().getData();
 
-        /* Create the managers */
+        /* Create the barrel */
         Block block = getBukkitBlock();
         World world = getBukkitBlock().getWorld();
 
@@ -110,7 +112,7 @@ public class Barrel extends BarrelConduit {
             }
         }
         if (itemFrame == null) {
-            Bukkit.getLogger().severe("Failed to find itemframe for managers @ " + getBukkitBlock().getLocation());
+            BasicBarrels.logError("Failed to find itemframe for barrel @ " + getBukkitBlock().getLocation());
         }
         item = itemFrame.getItem();
         updateDisplay();
@@ -130,19 +132,20 @@ public class Barrel extends BarrelConduit {
     }
 
     public ItemStack changeBarrel(ItemStack barrelItem) {
-        ItemStack oldBarrel = createItemStack(type, material, blockData);
+        ItemStack oldBarrel = createItemStack(type, material);
         BarrelType oldType = type;
-        byte placeBlockData;
+        Orientable orientable = (Orientable) getBukkitBlock().getBlockData();
+        Axis axis = orientable.getAxis();
 
         type = BarrelType.fromName(barrelItem.getItemMeta().getLore().get(1));
         material = barrelItem.getType();
-        blockData = barrelItem.getData().getData();
-        /* Bits 2-3 contain the oriatation of the log and is common to both log types add this with the data from the new log */
-        placeBlockData = blockData;
-        placeBlockData |= getBukkitBlock().getData() & 0x0C;
-        BlockState state = getBukkitBlock().getState();
-        state.setType(material);
-        state.setRawData(placeBlockData);
+
+        getBukkitBlock().setType(material);
+        BlockState state;
+        state = getBukkitBlock().getState();
+        orientable = (Orientable) state.getBlockData();
+        orientable.setAxis(axis);
+        state.setBlockData(orientable);
         state.update();
 
         BasicBarrels.logEvent(barrelLogPrefix() + ": Barrel changed from " + oldType + " to " + type);
@@ -157,9 +160,9 @@ public class Barrel extends BarrelConduit {
         blacklist.clear();
     }
 
-    public static ItemStack createItemStack(BarrelType type, Material material, byte dataValue) {
+    public static ItemStack createItemStack(BarrelType type, Material material) {
         /* Create the ItemStack we wish to produce */
-        ItemStack item = new ItemStack(material, 1, (short) 0, dataValue);
+        ItemStack item = new ItemStack(material, 1);
         ItemMeta data = item.getItemMeta();
         data.setDisplayName(type.getName());
         List<String> loreText = new ArrayList<String>();
@@ -205,11 +208,11 @@ public class Barrel extends BarrelConduit {
 
     public boolean hasPermission(Player player) {
         /* Lock bypass all bypass all the checks below */
-        if (player.hasPermission("managers.mod.lockbypass")) {
+        if (player.hasPermission("barrel.mod.lockbypass")) {
             return true;
         }
 
-        if (!player.hasPermission("managers.player.use")) {
+        if (!player.hasPermission("barrel.player.use")) {
             return false;
         }
 
@@ -256,7 +259,7 @@ public class Barrel extends BarrelConduit {
         BasicBarrels.logEvent( barrelLogPrefix() +  ": Barrel broken dropping " + amount + " of " + item.getType());
         Location location = getBukkitBlock().getLocation();
 
-        /* Spawn items from where the managers being broken is */
+        /* Spawn items from where the barrel being broken is */
         while (amount != 0) {
             int dropCount = Math.min(amount, item.getMaxStackSize());
 
@@ -264,12 +267,12 @@ public class Barrel extends BarrelConduit {
             amount -= dropCount;
         }
 
-        /* Drop an item stack which represents the managers being broken */
+        /* Drop an item stack which represents the barrel being broken */
         if (dropBarrelItem) {
-            location.getWorld().dropItemNaturally(location, createItemStack(type, material, blockData));
+            location.getWorld().dropItemNaturally(location, createItemStack(type, material));
         }
 
-        /* Remove items which represent the managers in the world */
+        /* Remove items which represent the barrel in the world */
         itemFrame.remove();
         BlockState state = location.getBlock().getState();
         state.setType(Material.AIR);
@@ -298,14 +301,12 @@ public class Barrel extends BarrelConduit {
 
     public boolean addItemsFromInventory(Inventory inventory, int firstSlot, int lastSlot, int addAmount) throws BarrelException {
         int beforeAmount = this.amount;
-        /*
-         * If the managers is empty only one slot can be specified otherwise the required
-         * operation is unclear.
-         */
-        if ((amount == 0) && (firstSlot != lastSlot)) {
-            throw new BarrelException(BarrelException.Reason.UNCLEAR_OPERATION);
-        }
 
+        /*
+         * If the barrel is empty set what it is to store based on the first slot, other
+         * slots might contain other items in which case they will not be stored, but this
+         * is true for barrels whose content has already been set.
+         */
         if (amount == 0) {
             if (!isStoreable(inventory.getItem(firstSlot))) {
                 return true;
@@ -324,7 +325,7 @@ public class Barrel extends BarrelConduit {
             if (matchsBarrelItem(addItem)) {
                 int stackSize = Math.min(toTransfer, addItem.getAmount());
                 if (stackSize >= addItem.getAmount()) {
-                    inventory.setItem(i, null);
+                    inventory.clear(i);
                 } else {
                     addItem.setAmount(addItem.getAmount() - stackSize);
                 }
@@ -336,7 +337,7 @@ public class Barrel extends BarrelConduit {
             }
         }
         if (beforeAmount != amount) {
-            BasicBarrels.logEvent(barrelLogPrefix() + " : Added items to managers (from " + beforeAmount + " to " + amount + ")");
+            BasicBarrels.logEvent(barrelLogPrefix() + " : Added items to barrel (from " + beforeAmount + " to " + amount + ")");
             updateDisplay();
         }
         if ((type.getSize() * item.getMaxStackSize()) == amount) {
@@ -349,7 +350,7 @@ public class Barrel extends BarrelConduit {
     public void removeItemsToInventory(Inventory inventory, int firstSlot, int lastSlot, int removeAmount) {
         int beforeAmount = this.amount;
         /*
-         * If the managers is empty there is nothing to remove!
+         * If the barrel is empty there is nothing to remove!
          */
         if (amount == 0) {
             return;
@@ -365,7 +366,7 @@ public class Barrel extends BarrelConduit {
                 stackSize = Math.min(toTransfer, item.getMaxStackSize());
                 inventory.setItem(i, itemStackFromBarrel(stackSize));
             } else if (matchsBarrelItem(removeItem)) {
-                /* The slot is not empty so fill it up until the managers is empty */
+                /* The slot is not empty so fill it up until the barrel is empty */
                 stackSize = Math.min(toTransfer, removeItem.getMaxStackSize() - removeItem.getAmount());
                 removeItem.setAmount(removeItem.getAmount() + stackSize);
             } else {
@@ -381,7 +382,7 @@ public class Barrel extends BarrelConduit {
         }
 
         if (beforeAmount != amount) {
-            BasicBarrels.logEvent(barrelLogPrefix() + " : Removed items to managers (from " + beforeAmount + " to " + amount + ")");
+            BasicBarrels.logEvent(barrelLogPrefix() + " : Removed items to barrel (from " + beforeAmount + " to " + amount + ")");
             updateDisplay();
         }
     }
@@ -401,8 +402,19 @@ public class Barrel extends BarrelConduit {
 
     static public boolean isStoreable(ItemStack item) {
         ItemMeta meta = item.getItemMeta();
-        if (meta.hasDisplayName() || meta.hasEnchants() || meta.hasLore())
+        if (meta != null) {
+            if (meta.hasDisplayName() || meta.hasEnchants() || meta.hasLore())
+                return false;
+            if (meta instanceof Damageable) {
+                Damageable damageable = (Damageable) meta;
+                if (damageable.hasDamage()) {
+                    return false;
+                }
+            }
+        }
+        if (BarrelManager.shulkerBoxes.contains(item.getType())) {
             return false;
+        }
         if (blacklist.contains(item.getType()))
             return false;
 
@@ -432,11 +444,8 @@ public class Barrel extends BarrelConduit {
             PotionData addData = addMeta.getBasePotionData();
 
             return barrelData.equals(addData);
-        } else {
-            /* Check the item stacks attributes for a match*/
-            return 	(addItem.getDurability() == item.getDurability()) &&
-                    (addItem.getData().getData() == item.getData().getData());
         }
+        return true;
     }
 
     private ItemStack itemStackFromBarrel(int stackSize) {
@@ -446,15 +455,14 @@ public class Barrel extends BarrelConduit {
                 item.getType().equals(Material.SPLASH_POTION) ||
                 item.getType().equals(Material.LINGERING_POTION) ||
                 item.getType().equals(Material.TIPPED_ARROW)) {
-            newStack = new ItemStack(item.getType(), amount);
+            newStack = new ItemStack(item.getType(), stackSize);
             PotionMeta pMeta = (PotionMeta) item.getItemMeta();
             pMeta.setDisplayName(null);
             pMeta.setLore(null);
             newStack.setItemMeta(pMeta);
         } else {
-            newStack = new ItemStack(item.getType(), stackSize, item.getDurability(), item.getData().getData());
+            newStack = new ItemStack(item.getType(), stackSize);
             newStack.setData(item.getData());
-            newStack.setDurability(item.getDurability());
         }
         return newStack;
     }
