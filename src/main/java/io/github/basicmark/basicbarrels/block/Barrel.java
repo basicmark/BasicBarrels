@@ -95,7 +95,7 @@ public class Barrel extends BarrelConduit {
     }
 
     @Override
-    public void load(ConfigurationSection config) {
+    public boolean load(ConfigurationSection config) {
         super.load(config);
         ownerUUID = UUID.fromString(config.getString("ownerUUID"));
         amount = config.getInt("amount");
@@ -113,11 +113,13 @@ public class Barrel extends BarrelConduit {
         }
         if (itemFrame == null) {
             BasicBarrels.logError("Failed to find itemframe for barrel @ " + getBukkitBlock().getLocation());
+            return false;
         }
         item = itemFrame.getItem();
         updateDisplay();
         BasicBarrels.logEvent(barrelLogPrefix() + ": Barrel loaded. Owner " + ownerUUID + ", type " + type + ", locked " + (locked ? "locked":"unlocked"));
         setMetaData();
+        return true;
     }
 
     @Override

@@ -178,7 +178,8 @@ public class BarrelConduit extends ExtendBlock {
     }
 
     @Override
-    public void load(ConfigurationSection config) {
+    public boolean load(ConfigurationSection config) {
+        return true;
     }
 
     @Override

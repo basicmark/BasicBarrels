@@ -63,9 +63,13 @@ public class BarrelController extends BarrelConduit {
     }
 
     @Override
-    public void load(ConfigurationSection config) {
-        super.load(config);
-        BasicBarrels.logEvent(barrelControllerLogPrefix() + ": Barrel controller loaded");
+    public boolean load(ConfigurationSection config) {
+        boolean ret;
+        ret = super.load(config);
+        if (ret) {
+            BasicBarrels.logEvent(barrelControllerLogPrefix() + ": Barrel controller loaded");
+        }
+        return true;
     }
 
     @Override
