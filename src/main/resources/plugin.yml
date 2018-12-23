@@ -34,6 +34,9 @@ permissions:
     barrel.player.info:
         description: Permission node which controls if use of the info command is allowed.
         default: true
+    barrel.player.connected:
+        description: Permission node which controls if use of the connected command is allowed.
+        default: true
     barrel.mod.lockbypass:
         description: Permission node which controls if user can bypass locking.
         default: op

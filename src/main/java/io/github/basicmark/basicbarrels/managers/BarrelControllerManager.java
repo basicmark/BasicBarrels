@@ -79,7 +79,7 @@ public class BarrelControllerManager implements Listener {
 
             /* Check permissions */
             Player player = event.getPlayer();
-            if (!player.hasPermission("managers.player.place")) {
+            if (!player.hasPermission("barrel.player.place")) {
                 throw new BarrelException(BarrelException.Reason.BARREL_PERMISSION);
             }
 
@@ -162,10 +162,15 @@ public class BarrelControllerManager implements Listener {
             return;
         }
 
+        /* We will handle dropping of the controller */
+        event.setDropItems(false);
+
+        /* Remove the controller and its extended data */
         BarrelController controller = (BarrelController) extBlock;
         controller.removeBarrelController();
         extMinecraft.clearBlock(extBlock);
 
+        /* Create the itemstack to drop */
         Player player = event.getPlayer();
         player.getWorld().dropItemNaturally(event.getBlock().getLocation(), controllerItem);
     }

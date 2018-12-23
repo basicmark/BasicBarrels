@@ -132,7 +132,7 @@ public class BarrelManager implements Listener {
     @EventHandler
     public void onPrepareItemCraftEvent(PrepareItemCraftEvent event) {
         /* Check if the player is allowed to craft a managers */
-        if ((recipes.contains(event.getRecipe()) && (!event.getView().getPlayer().hasPermission("managers.player.craft")))) {
+        if ((recipes.contains(event.getRecipe()) && (!event.getView().getPlayer().hasPermission("barrel.player.craft")))) {
             event.getInventory().setResult(null);
         }
 
@@ -168,7 +168,7 @@ public class BarrelManager implements Listener {
             }
 
             /* Check permissions */
-            if (!player.hasPermission("managers.player.place")) {
+            if (!player.hasPermission("barrel.player.place")) {
                 throw new BarrelException(BarrelException.Reason.BARREL_PERMISSION);
             }
 
@@ -218,7 +218,7 @@ public class BarrelManager implements Listener {
             /* Cancel regardless of if the player has perms or not */
             event.setCancelled(true);
             /* Check permissions */
-            if (!player.hasPermission("managers.player.break")) {
+            if (!player.hasPermission("barrel.player.break")) {
                 throw new BarrelException(BarrelException.Reason.BARREL_PERMISSION);
             }
 
@@ -311,7 +311,7 @@ public class BarrelManager implements Listener {
                 PlayerInventory inventory = player.getInventory();
 
                 if (player.isSneaking()) {
-                    /* If the barel is empty then add the held item first to set the contents */
+                    /* If the barrel is empty then add the held item first to set the contents */
                     if (barrel.isEmpty()) {
                         barrel.addItemsFromInventory(inventory, inventory.getHeldItemSlot(), inventory.getHeldItemSlot(), barrel.getMaxStackSize());
                     }
