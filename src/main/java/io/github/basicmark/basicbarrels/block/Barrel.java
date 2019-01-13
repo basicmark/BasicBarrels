@@ -44,7 +44,8 @@ public class Barrel extends BarrelConduit {
     public static final String metadataKey = "BasicBarrel";
     public static final EnumSet<BarrelType> barrelSet = EnumSet.allOf(BarrelType.class);
     public static EnumSet<Material> logTypeSet = EnumSet.of(Material.ACACIA_LOG, Material.BIRCH_LOG, Material.DARK_OAK_LOG,
-            Material.JUNGLE_LOG, Material.OAK_LOG, Material.SPRUCE_LOG);
+            Material.JUNGLE_LOG, Material.OAK_LOG, Material.SPRUCE_LOG, Material.STRIPPED_ACACIA_LOG, Material.STRIPPED_BIRCH_LOG,
+            Material.STRIPPED_DARK_OAK_LOG, Material.STRIPPED_JUNGLE_LOG, Material.STRIPPED_OAK_LOG, Material.STRIPPED_SPRUCE_LOG);
     private static final Set<Material> blacklist = new HashSet<Material>();
     private static final BlockFace[] faces = {BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST};
     private static ItemStack empty;
