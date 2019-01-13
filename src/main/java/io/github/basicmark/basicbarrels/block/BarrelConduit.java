@@ -1,6 +1,7 @@
 package io.github.basicmark.basicbarrels.block;
 
 import io.github.basicmark.basicbarrels.BasicBarrels;
+import io.github.basicmark.basicbarrels.Utils;
 import io.github.basicmark.extendminecraft.ExtendMinecraft;
 import io.github.basicmark.extendminecraft.block.ExtendBlock;
 import org.bukkit.block.Block;
@@ -118,7 +119,10 @@ public class BarrelConduit extends ExtendBlock {
 
         /* First find all adjacent conduits keeping track of the the highest level */
         for (BlockFace face : connectableFaces) {
-            Block conBlock = block.getRelative(face);
+            Block conBlock = Utils.getBlockRelativeIfLoaded(block, face);
+            if (conBlock == null) {
+                continue;
+            }
             ExtendBlock extConBlock = extendMinecraft.getBlock(conBlock);
             if (extConBlock instanceof BarrelConduit) {
                 BarrelConduit adjConduit = (BarrelConduit) extConBlock;
@@ -149,7 +153,10 @@ public class BarrelConduit extends ExtendBlock {
         linkController(null, 0);
 
         for (BlockFace face : connectableFaces) {
-            Block conBlock = block.getRelative(face);
+            Block conBlock = Utils.getBlockRelativeIfLoaded(block, face);
+            if (conBlock == null) {
+                continue;
+            }
             ExtendBlock extConBlock = extendMinecraft.getBlock(conBlock);
             if (extConBlock instanceof BarrelConduit) {
                 BarrelConduit adjConduit = (BarrelConduit) extConBlock;

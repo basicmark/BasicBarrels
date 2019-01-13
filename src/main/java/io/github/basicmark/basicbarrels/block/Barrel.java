@@ -11,6 +11,7 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.data.Orientable;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -26,7 +27,7 @@ import java.util.*;
 
 public class Barrel extends BarrelConduit {
     /*
-     * Version of data offsets we're using.
+     * Version of data offsets we're using for itemstacks.
      *
      * Chances are we might need to extend the loreText pre-amble
      * so we version our data so we can support backwards compatibility.
@@ -39,6 +40,7 @@ public class Barrel extends BarrelConduit {
     /* Version 1 offsets */
     public static final int typeOffset = 1;
 
+    /* Static class members */
     public static final String metadataKey = "BasicBarrel";
     public static final EnumSet<BarrelType> barrelSet = EnumSet.allOf(BarrelType.class);
     public static EnumSet<Material> logTypeSet = EnumSet.of(Material.ACACIA_LOG, Material.BIRCH_LOG, Material.DARK_OAK_LOG,
@@ -47,14 +49,31 @@ public class Barrel extends BarrelConduit {
     private static final BlockFace[] faces = {BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST};
     private static ItemStack empty;
 
+    /* Dynamic class members */
+    private FixedMetadataValue metadata;
+    private ItemFrame itemFrame;
+    private BlockFace facing;
+
+    /******************************************
+     * State saved in the block configuration *
+     * through ExtendMincraft                 *
+     ******************************************/
+
+    /* Save format version */
+    private static final int saveDataVersion = 1;
+
+    /* Save state in version 0 */
     private int amount;
-    private ItemStack item;
     private BarrelType type;
     private UUID ownerUUID;
     private boolean locked;
     private Material material;
     private byte blockData;
-    private ItemFrame itemFrame;
+    UUID itemFrameUUID;
+
+    /* Added to save state in version 1 */
+    private String facingString;
+    private ItemStack item;
 
 
     static {
@@ -89,48 +108,175 @@ public class Barrel extends BarrelConduit {
             }
         });
 
+        this.itemFrameUUID = itemFrame.getUniqueId();
         this.itemFrame.setItem(this.item);
-        BasicBarrels.logEvent(barrelLogPrefix() + ": Barrel placed by " + ownerUUID + " of type " + type + " and is " + (locked ? "locked":"unlocked"));
+        this.facing = hangingFace;
+        this.facingString = this.facing.toString();
+        BasicBarrels.logEvent(barrelLogPrefix() + ": Barrel placed by " + ownerUUID + ", type " + type + ", " + (locked ? "locked":"unlocked") + ", amount " + amount);
+        metadata = new FixedMetadataValue(BarrelManager.plugin, this);
         setMetaData();
     }
 
     @Override
     public boolean load(ConfigurationSection config) {
         super.load(config);
+        metadata = new FixedMetadataValue(BarrelManager.plugin, this);
+
+        int loadVersion = config.getInt("version", 0);
         ownerUUID = UUID.fromString(config.getString("ownerUUID"));
         amount = config.getInt("amount");
         material = Material.valueOf(config.getString("material", Material.AIR.toString()));
         blockData = (byte) config.getInt("blockdata", 0);
         type = BarrelType.valueOf(config.getString("type"));
-        UUID itemFrameUUID = UUID.fromString(config.getString("itemframe"));
+
+        /*
+         * Earlier save formats didn't store the facing direction,
+         * later versions should have itemstack and direction
+         */
+        if (loadVersion >= 1) {
+            facingString = config.getString("facing", null);
+            if (facingString != null) {
+                facing = BlockFace.valueOf(facingString);
+            }
+            if (config.isItemStack("itemstack")) {
+                item = config.getItemStack("itemstack");
+            } else {
+                item = null;
+            }
+        } else {
+            item = null;
+        }
+
+        itemFrameUUID = UUID.fromString(config.getString("itemframe"));
         Collection<ItemFrame> entities = getBukkitBlock().getWorld().getEntitiesByClass​(ItemFrame.class);
-        itemFrame = null;
+        ItemFrame locaItemFrame = null;
         for (ItemFrame entity : entities) {
             if (entity.getUniqueId().equals(itemFrameUUID)) {
-                itemFrame = entity;
+                locaItemFrame = entity;
                 break;
             }
         }
-        if (itemFrame == null) {
-            BasicBarrels.logError("Failed to find itemframe for barrel @ " + getBukkitBlock().getLocation());
-            return false;
+
+        /*
+         * There is a chance the itemframe is in a chunk which is not loaded in which case
+         * we should not treat it as a loading error but will have to handle the fact that
+         * the barrel is missing an itemframe but is registered with ExtendMinecraft and
+         * so could have operations performed on it.
+         */
+        if (locaItemFrame == null) {
+            /*
+             * Build a set of chunk locations which might contain the itemframe ...
+             */
+            Set<Integer[]> chunkLocations = new HashSet<Integer[]>();
+            if (facingString == null) {
+                int chunkXOffset = getBukkitBlock().getX() & 0xf;
+                int chunkZOffset = getBukkitBlock().getZ() & 0xf;
+                if (((chunkXOffset == 0) || (chunkXOffset == 15)) || ((chunkZOffset == 0) || (chunkZOffset == 15))) {
+                    chunkLocations.add(new Integer[]{(getBukkitBlock().getX() >> 4) - 1, (getBukkitBlock().getZ() >> 4) + 0});
+                    chunkLocations.add(new Integer[]{(getBukkitBlock().getX() >> 4) + 1, (getBukkitBlock().getZ() >> 4) + 0});
+                    chunkLocations.add(new Integer[]{(getBukkitBlock().getX() >> 4) + 0, (getBukkitBlock().getZ() >> 4) - 1});
+                    chunkLocations.add(new Integer[]{(getBukkitBlock().getX() >> 4) + 0, (getBukkitBlock().getZ() >> 4) + 1});
+                }
+            } else {
+                Integer[] chunkLoc = getItemFrameChunk();
+                chunkLocations.add(chunkLoc);
+            }
+
+            /* .. then check to see which chunk(s) in the set are loaded... */
+            Iterator<Integer[]> iter = chunkLocations.iterator();
+            while (iter.hasNext()) {
+                Integer[] chunkLocation = iter.next();
+                if (getBukkitBlock().getWorld().isChunkLoaded(chunkLocation[0], chunkLocation[1])) {
+                    iter.remove();
+                }
+            }
+
+            /*
+             * ... and if all the locations are loaded (and to get here we know we have no itemFrame)
+             * then report failure to load the barrel. Otherwise ...
+             */
+            if (chunkLocations.isEmpty()) {
+                BasicBarrels.logError("Failed to find itemframe for barrel @ " + getBukkitBlock().getLocation());
+                return false;
+            }
+
+            /*
+             * ... the itemFrame might be present but until the chunk its in is loaded we don't know
+             * so we assume it will be present (by not reporting an error during loading) and register
+             * with the manager to call back and check when the possible chunk(s) are loaded.
+             */
+            BasicBarrels.getBarrelManager().registerDeferredItemFrameLoad(this, chunkLocations);
+            BasicBarrels.logEvent(barrelLogPrefix() + ": Barrel deferred load. Owner " + ownerUUID + ", type " + type + ", " + (locked ? "locked":"unlocked") + ", amount " + amount);
         }
-        item = itemFrame.getItem();
-        updateDisplay();
-        BasicBarrels.logEvent(barrelLogPrefix() + ": Barrel loaded. Owner " + ownerUUID + ", type " + type + ", locked " + (locked ? "locked":"unlocked"));
-        setMetaData();
+        else {
+            loadItemFrame(locaItemFrame);
+        }
+
         return true;
+    }
+
+    private Integer[] getItemFrameChunk() {
+        int x = getBukkitBlock().getX() >> 4;
+        int z = getBukkitBlock().getZ() >> 4;
+        switch (facing) {
+            case NORTH:
+                z -= 1;
+                break;
+            case SOUTH:
+                z += 1;
+                break;
+            case EAST:
+                x += 1;
+                break;
+            case WEST:
+                x -= 1;
+                break;
+        }
+        return new Integer[]{x,z};
+    }
+
+    private void loadItemFrame(ItemFrame barrelItemFrame) {
+        /* If we didn't have a facing direction then work it out from the itemframe */
+        if (facingString == null) {
+            facing = barrelItemFrame.getFacing();
+            facingString = facing.toString();
+        }
+        itemFrame = barrelItemFrame;
+
+        /* If we didn't have an item then get the item from the frame */
+        if (item == null) {
+            item = itemFrame.getItem();
+        }
+        updateDisplay();
+        BasicBarrels.logEvent(barrelLogPrefix() + ": Barrel loadItemFrame. Owner " + ownerUUID + ", type " + type + ", " + (locked ? "locked":"unlocked") + ", amount " + amount);
+        setMetaData();
+    }
+
+    public boolean checkForItemFrame(Chunk chunk) {
+        Entity entities[] = chunk.getEntities();
+        for (Entity entity : entities) {
+            if ((entity.getUniqueId().equals(itemFrameUUID)) && (entity instanceof ItemFrame)) {
+                loadItemFrame((ItemFrame) entity);
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
     public void save(ConfigurationSection config) {
         super.save(config);
+        config.set("version", saveDataVersion);
         config.set("ownerUUID", ownerUUID.toString());
         config.set("amount", amount);
         config.set("material", material.name());
         config.set("type", type.toString());
         config.set("blockdata", blockData);
-        config.set("itemframe", itemFrame.getUniqueId().toString());
+        config.set("facing", facingString);
+        config.set("itemframe", itemFrameUUID.toString());
+        if (item != null) {
+            config.set("itemstack", item);
+        }
     }
 
     public ItemStack changeBarrel(ItemStack barrelItem) {
@@ -177,35 +323,59 @@ public class Barrel extends BarrelConduit {
     }
 
     private void updateDisplay() {
-        if (amount == 0) {
-            itemFrame.setItem(empty.clone());
-        } else {
-            Integer stackSize = item.getMaxStackSize();
-            Integer remain = amount % stackSize;
-            int stackCount = (amount - remain) / stackSize;
-            ItemMeta barrelMeta = item.getItemMeta();
-            barrelMeta.setDisplayName(stackCount + "*" + stackSize + "+" + remain);
-            item.setItemMeta(barrelMeta);
-            itemFrame.setItem(item);
+        if (itemFrame != null) {
+            /*
+             * We updating check if the itemframe object is still valid, it's possible the chunk with it
+             * has been updated and reloaded since we found it or is now back in an unloaded chunk.
+             */
+            if (!itemFrame.isValid()) {
+                /* Release our reference to the dead object */
+                itemFrame = null;
+
+                /* Get a list of chunk locations the itemframe could be in */
+                Integer[] chunkLoc = getItemFrameChunk();
+                if (getBukkitBlock().getWorld().isChunkLoaded(chunkLoc[0], chunkLoc[1])) {
+                    checkForItemFrame(getBukkitBlock().getWorld().getChunkAt(chunkLoc[0], chunkLoc[1]));
+                } else {
+                    HashSet<Integer[]> chunkLocationSet = new HashSet<Integer[]>();
+                    chunkLocationSet.add(chunkLoc);
+                    BasicBarrels.getBarrelManager().registerDeferredItemFrameLoad(this, chunkLocationSet);
+                }
+            } else {
+                if (amount == 0) {
+                    itemFrame.setItem(empty.clone());
+                } else {
+                    Integer stackSize = item.getMaxStackSize();
+                    Integer remain = amount % stackSize;
+                    int stackCount = (amount - remain) / stackSize;
+                    ItemMeta barrelMeta = item.getItemMeta();
+                    barrelMeta.setDisplayName(stackCount + "*" + stackSize + "+" + remain);
+                    item.setItemMeta(barrelMeta);
+                    itemFrame.setItem(item);
+                }
+            }
         }
     }
 
-    public void removeBarrel() {
+    public void unload() {
         BasicBarrels.logEvent(barrelLogPrefix() + ": Barrel removed");
+        /* The unregister method handles if there was never a register call made. */
+        BasicBarrels.getBarrelManager().unregisterDeferredItemFrameLoad(this);
         removeMetaData();
     }
 
     private void setMetaData() {
-        Block block = getBukkitBlock();
-        FixedMetadataValue metadata = new FixedMetadataValue(BarrelManager.plugin, this);
-        itemFrame.setMetadata(metadataKey, metadata);
-        itemFrame.getLocation().getBlock().setMetadata(metadataKey, metadata);
+        if (itemFrame != null) {
+            itemFrame.setMetadata(metadataKey, metadata);
+            itemFrame.getLocation().getBlock().setMetadata(metadataKey, metadata);
+        }
     }
 
     private void removeMetaData() {
-        Block block = getBukkitBlock();
-        itemFrame.removeMetadata(metadataKey, BarrelManager.plugin);
-        itemFrame.getLocation().getBlock().removeMetadata(metadataKey, BarrelManager.plugin);
+        if (itemFrame != null) {
+            itemFrame.removeMetadata(metadataKey, BarrelManager.plugin);
+            itemFrame.getLocation().getBlock().removeMetadata(metadataKey, BarrelManager.plugin);
+        }
     }
 
     public boolean hasPermission(Player player) {
@@ -246,7 +416,9 @@ public class Barrel extends BarrelConduit {
     }
 
     public void setHighlight(boolean highlight) {
-        itemFrame.setGlowing(highlight);
+        if (itemFrame != null) {
+            itemFrame.setGlowing(highlight);
+        }
     }
 
     public void breakBarrel(Player player) {
@@ -257,9 +429,17 @@ public class Barrel extends BarrelConduit {
         breakBarrel(dropBarrelItem);
     }
 
-    public void breakBarrel(boolean dropBarrelItem) {
+    public boolean breakBarrel(boolean dropBarrelItem) {
         BasicBarrels.logEvent( barrelLogPrefix() +  ": Barrel broken dropping " + amount + " of " + item.getType());
         Location location = getBukkitBlock().getLocation();
+
+        /*
+         * Don't allow breaking of incomplete barrels as we might not know what they store and can't
+         * remove their itemframe anyway.
+         */
+        if (itemFrame == null) {
+            return false;
+        }
 
         /* Spawn items from where the barrel being broken is */
         while (amount != 0) {
@@ -282,6 +462,7 @@ public class Barrel extends BarrelConduit {
 
         BasicBarrels.getExtendMinecraft().clearBlock(this);
         removeMetaData();
+        return true;
     }
 
     public boolean isEmpty() {
@@ -303,6 +484,11 @@ public class Barrel extends BarrelConduit {
 
     public boolean addItemsFromInventory(Inventory inventory, int firstSlot, int lastSlot, int addAmount) throws BarrelException {
         int beforeAmount = this.amount;
+
+        /* Treat incomplete barrels as full as we don't know what they are storing */
+        if (itemFrame == null) {
+            return true;
+        }
 
         /*
          * If the barrel is empty set what it is to store based on the first slot, other
@@ -351,6 +537,12 @@ public class Barrel extends BarrelConduit {
 
     public void removeItemsToInventory(Inventory inventory, int firstSlot, int lastSlot, int removeAmount) {
         int beforeAmount = this.amount;
+
+        /* Treat incomplete barrels as empty as we don't know what they are storing */
+        if (itemFrame == null) {
+            return;
+        }
+
         /*
          * If the barrel is empty there is nothing to remove!
          */

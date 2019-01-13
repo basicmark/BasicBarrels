@@ -22,6 +22,7 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.hanging.HangingBreakEvent;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.metadata.MetadataValue;
@@ -43,7 +44,8 @@ public class BarrelManager implements Listener {
     public static BasicBarrels plugin = null;
     private static Boolean defaultLocking = true;
     private Set<Recipe> recipes = new HashSet<Recipe>();
-    private Map<Player, BarrelOperation> playerOperation = new HashMap<Player, BarrelOperation>();;
+    private Map<Player, BarrelOperation> playerOperation = new HashMap<Player, BarrelOperation>();
+    private HashMap<Barrel, PendingItemFrameData> pendingItemFrames = new HashMap<Barrel, PendingItemFrameData>();
 
     public BarrelManager(BasicBarrels barrelPlugin) {
         plugin = barrelPlugin;
@@ -90,6 +92,14 @@ public class BarrelManager implements Listener {
 
     public static void setDefaultLocking(boolean value) {
         defaultLocking = value;
+    }
+
+    public void registerDeferredItemFrameLoad(Barrel barrel, Set<Integer[]> chunkCords) {
+        pendingItemFrames.put(barrel, new PendingItemFrameData(barrel, chunkCords));
+    }
+
+    public void unregisterDeferredItemFrameLoad(Barrel barrel) {
+        pendingItemFrames.remove(barrel);
     }
 
     private boolean handlePendingRequest(Barrel barrel, Player player) {
@@ -405,12 +415,64 @@ public class BarrelManager implements Listener {
             if (Barrel.logTypeSet.contains(block.getType())) {
                 event.setCancelled(true);
             } else {
-                barrel.breakBarrel(true);
+                /*
+                 * Should never happen but if we have an itemframe break but the barrel
+                 * can't be broken then cancel the event.
+                 */
+                if (!barrel.breakBarrel(true)) {
+                    event.setCancelled(true);
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onChunkLoadEvent(ChunkLoadEvent event) {
+        for (PendingItemFrameData pending : pendingItemFrames.values()) {
+            if (pending.checkAndRemoveChunk(event.getChunk())) {
+                /* The itemFrame was found so remove this entry from the pending set */
+                pendingItemFrames.remove(pending.getBarrel());
+            } else {
+                /* The itemFrame was not found and all the chunks where checked so remove from the pending set */
+                /* TODO: Either here or in the barrel class we should call ExtendMinecraft to move this into the missing list */
+                if (!pending.hasMoreChunkLocations()) {
+                    pendingItemFrames.remove(pending.getBarrel());
+                }
             }
         }
     }
 
     public enum BarrelOperation {
         LOCK, UNLOCK, INFO
+    }
+    private class PendingItemFrameData {
+        private Barrel barrel;
+        Set<Integer[]> chunkLocations;
+
+        PendingItemFrameData(Barrel barrel, Set<Integer[]> chunkLocations) {
+            this.barrel = barrel;
+            this.chunkLocations = chunkLocations;
+        }
+
+        boolean checkAndRemoveChunk(Chunk chunk) {
+            Iterator<Integer[]> iter = chunkLocations.iterator();
+            boolean found = false;
+            while (iter.hasNext() && (!found)) {
+                Integer[] chunkLocation = iter.next();
+                if ((chunk.getX() == chunkLocation[0]) && (chunk.getZ() == chunkLocation[1])) {
+                    iter.remove();
+                    found = barrel.checkForItemFrame(chunk);
+                }
+            }
+            return found;
+        }
+
+        boolean hasMoreChunkLocations() {
+            return !chunkLocations.isEmpty();
+        }
+
+        public Barrel getBarrel() {
+            return barrel;
+        }
     }
 }

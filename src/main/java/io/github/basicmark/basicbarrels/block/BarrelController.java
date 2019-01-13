@@ -2,6 +2,7 @@ package io.github.basicmark.basicbarrels.block;
 
 import io.github.basicmark.basicbarrels.BarrelException;
 import io.github.basicmark.basicbarrels.BasicBarrels;
+import io.github.basicmark.basicbarrels.Utils;
 import io.github.basicmark.basicbarrels.managers.BarrelControllerManager;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -264,7 +265,10 @@ public class BarrelController extends BarrelConduit {
          * it to the barrels this controller is connected to.
          */
         for (BlockFace face : connectableFaces) {
-            Block conBlock = getBukkitBlock().getRelative(face);
+            Block conBlock = Utils.getBlockRelativeIfLoaded(getBukkitBlock(), face);
+            if (conBlock == null) {
+                continue;
+            }
             BlockState blockState = conBlock.getState();
             if (blockState instanceof InventoryHolder) {
                 InventoryHolder holder = (InventoryHolder) blockState;
