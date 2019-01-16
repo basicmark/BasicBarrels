@@ -38,7 +38,8 @@ public class BarrelManager implements Listener {
             Material.MAGENTA_SHULKER_BOX, Material.ORANGE_SHULKER_BOX,
             Material.PINK_SHULKER_BOX, Material.PURPLE_SHULKER_BOX,
             Material.RED_SHULKER_BOX, Material.WHITE_SHULKER_BOX,
-            Material.YELLOW_SHULKER_BOX, Material.BLUE_SHULKER_BOX);
+            Material.YELLOW_SHULKER_BOX, Material.BLUE_SHULKER_BOX,
+            Material.LIGHT_GRAY_SHULKER_BOX);
     private static final BlockFace[] faces = {BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST};
 
     public static BasicBarrels plugin = null;
