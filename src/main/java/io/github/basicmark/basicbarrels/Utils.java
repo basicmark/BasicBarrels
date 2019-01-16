@@ -1,5 +1,6 @@
 package io.github.basicmark.basicbarrels;
 
+import org.bukkit.Bukkit;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 
@@ -27,8 +28,8 @@ public class Utils {
     }
 
     public static Integer[] getBlockRelativeChunk(Block block, BlockFace face) {
-        int x = block.getX() >> 4;
-        int z = block.getZ() >> 4;
+        int x = block.getX();
+        int z = block.getZ();
 
         switch (face) {
             case NORTH:
@@ -44,6 +45,6 @@ public class Utils {
                 x -= 1;
                 break;
         }
-        return new Integer[]{x,z};
+        return new Integer[]{x >> 4,z >> 4};
     }
 }

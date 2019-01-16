@@ -21,7 +21,6 @@ public class BarrelConduit extends ExtendBlock {
 
     /* These members are dynamic are only live for the lifetime of the object */
     protected BarrelController linkedController;
-    private Set<BarrelConduit> scanedConduits =  new HashSet<BarrelConduit>();
     private boolean isController = false;
 
     static {
@@ -69,14 +68,6 @@ public class BarrelConduit extends ExtendBlock {
             if (newController != null) {
                 newController.add(this);
             }
-        }
-
-        /*
-         * A change in controller or level requires a reset of the cached scan list
-         * so we rescan them.
-         */
-        if ((oldController != newController) || (oldLevel != newLevel))  {
-            scanedConduits.clear();
         }
 
         return true;

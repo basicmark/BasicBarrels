@@ -61,13 +61,12 @@ public class Barrel extends BarrelConduit {
      ******************************************/
 
     /* Save format version */
-    private static final int saveDataVersion = 1;
+    private static final int saveDataVersion = 2;
 
     /* Save state in version 0 */
     private int amount;
     private BarrelType type;
     private UUID ownerUUID;
-    private boolean locked;
     private Material material;
     private byte blockData;
     UUID itemFrameUUID;
@@ -76,6 +75,8 @@ public class Barrel extends BarrelConduit {
     private String facingString;
     private ItemStack item;
 
+    /* Added to save state in version 2 */
+    private boolean locked;
 
     static {
         empty = new ItemStack(Material.BARRIER);
@@ -146,6 +147,12 @@ public class Barrel extends BarrelConduit {
             }
         } else {
             item = null;
+        }
+
+        if (loadVersion >= 2) {
+            locked = config.getBoolean("locked", true);
+        } else {
+            locked = true;
         }
 
         itemFrameUUID = UUID.fromString(config.getString("itemframe"));
@@ -278,6 +285,7 @@ public class Barrel extends BarrelConduit {
         if (item != null) {
             config.set("itemstack", item);
         }
+        config.set("locked", locked);
     }
 
     public ItemStack changeBarrel(ItemStack barrelItem) {
