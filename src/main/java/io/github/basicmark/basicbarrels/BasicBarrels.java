@@ -21,9 +21,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /*
- * Bugs
- *  - Stripped logs (or other blocks which replaced the barrel log block) cause item frame drop not to be canceled
- *  - Barrel controllers connecting through barrels on the edge of chunks don't build their network
  * Extra Features:
  * - Allow barrels to store items when broken rather then dropping them
  */
@@ -191,7 +188,6 @@ public class BasicBarrels extends JavaPlugin {
     public static BarrelManager getBarrelManager() {
         return barrelManager;
     }
-
 
 	public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
 		if (cmd.getName().equalsIgnoreCase("barrel")){

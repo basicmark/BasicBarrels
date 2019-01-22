@@ -26,8 +26,10 @@ import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.metadata.MetadataValue;
+import org.bukkit.NamespacedKey;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class BarrelManager implements Listener {
     /* TODO move to common class */
@@ -46,7 +48,7 @@ public class BarrelManager implements Listener {
     private static Boolean defaultLocking = true;
     private Set<Recipe> recipes = new HashSet<Recipe>();
     private Map<Player, BarrelOperation> playerOperation = new HashMap<Player, BarrelOperation>();
-    private HashMap<Barrel, PendingItemFrameData> pendingItemFrames = new HashMap<Barrel, PendingItemFrameData>();
+    private Map<Barrel, PendingItemFrameData> pendingItemFrames = new ConcurrentHashMap<Barrel, PendingItemFrameData>();
 
     public BarrelManager(BasicBarrels barrelPlugin) {
         plugin = barrelPlugin;
@@ -56,7 +58,7 @@ public class BarrelManager implements Listener {
             Integer dataTypeIndex = 0;
             for (Material log : Barrel.logTypeSet) {
                 ItemStack item = Barrel.createItemStack(barrel, log);
-                ShapedRecipe recipe = new ShapedRecipe(item);
+                ShapedRecipe recipe = new ShapedRecipe(new NamespacedKey(barrelPlugin, log.toString() + "_" + barrel.getName().toLowerCase().replace(" ", "_") ), item);
 
                 recipe.shape("EME","MLM","EME");
                 recipe.setIngredient('L', log);
@@ -188,7 +190,7 @@ public class BarrelManager implements Listener {
             BlockFace face = faces[Math.round(player.getLocation().getYaw() / 90f) & 3];
             Block inFrontBlock = block.getRelative(face);
 
-            if (inFrontBlock.getType() != Material.AIR) {
+            if ((inFrontBlock.getType() != Material.AIR) && (inFrontBlock.getType() != Material.CAVE_AIR)) {
                 throw new BarrelException(BarrelException.Reason.AIR_GAP);
             }
 
@@ -429,18 +431,12 @@ public class BarrelManager implements Listener {
 
     @EventHandler
     public void onChunkLoadEvent(ChunkLoadEvent event) {
-        for (PendingItemFrameData pending : pendingItemFrames.values()) {
-            if (pending.checkAndRemoveChunk(event.getChunk())) {
-                /* The itemFrame was found so remove this entry from the pending set */
-                pendingItemFrames.remove(pending.getBarrel());
-            } else {
-                /* The itemFrame was not found and all the chunks where checked so remove from the pending set */
-                /* TODO: Either here or in the barrel class we should call ExtendMinecraft to move this into the missing list */
-                if (!pending.hasMoreChunkLocations()) {
-                    pendingItemFrames.remove(pending.getBarrel());
-                }
-            }
-        }
+        /*
+         * Walk the entries and remove them if either the entry reported it should be removed or if:
+         * 1) The barrel found the itemframe
+         * 2) There where no more chunks to check
+         */
+        pendingItemFrames.entrySet().removeIf(pending-> pending.getValue().checkAndRemoveChunk(event.getChunk()) || !pending.getValue().hasMoreChunkLocations());
     }
 
     public enum BarrelOperation {

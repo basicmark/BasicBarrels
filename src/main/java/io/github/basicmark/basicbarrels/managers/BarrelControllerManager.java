@@ -8,6 +8,7 @@ import io.github.basicmark.extendminecraft.ExtendMinecraft;
 import io.github.basicmark.extendminecraft.block.ExtendBlock;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
 import org.bukkit.block.ShulkerBox;
 import org.bukkit.entity.Player;
@@ -46,7 +47,7 @@ public class BarrelControllerManager implements Listener {
         meta.setLore(lore);
         controllerItem.setItemMeta(meta);
 
-        recipe = new ShapedRecipe(controllerItem);
+        recipe = new ShapedRecipe(new NamespacedKey(barrelPlugin,  "barrel_controller"), controllerItem);
 
         recipe.shape("RQR","COC","RQR");
         recipe.setIngredient('R', Material.REDSTONE_BLOCK);
