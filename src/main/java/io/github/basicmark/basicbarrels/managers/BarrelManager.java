@@ -111,12 +111,36 @@ public class BarrelManager implements Listener {
 
             switch (playerOperation.get(player)) {
                 case LOCK:
-                    barrel.lock(player.getUniqueId());
-                    player.sendMessage(plugin.translateMessage("BARREL_LOCK"));
+                    if (barrel.hasPermission(player)) {
+                        barrel.lock(player.getUniqueId());
+                        player.sendMessage(plugin.translateMessage("BARREL_LOCK"));
+                    } else {
+                        player.sendMessage(plugin.translateMessage("BARREL_OPERATION_PERMISSION"));
+                    }
                     break;
                 case UNLOCK:
-                    barrel.unlock();
-                    player.sendMessage(plugin.translateMessage("BARREL_UNLOCK"));
+                    if (barrel.hasPermission(player)) {
+                        barrel.unlock();
+                        player.sendMessage(plugin.translateMessage("BARREL_UNLOCK"));
+                    } else {
+                        player.sendMessage(plugin.translateMessage("BARREL_OPERATION_PERMISSION"));
+                    }
+                    break;
+                case ITEMLOCK:
+                    if (barrel.hasPermission(player)) {
+                        barrel.itemLock();
+                        player.sendMessage(plugin.translateMessage("BARREL_ITEMLOCK"));
+                    } else {
+                        player.sendMessage(plugin.translateMessage("BARREL_OPERATION_PERMISSION"));
+                    }
+                    break;
+                case ITEMUNLOCK:
+                    if (barrel.hasPermission(player)) {
+                        barrel.itemUnlock();
+                        player.sendMessage(plugin.translateMessage("BARREL_ITEMUNLOCK"));
+                    } else {
+                        player.sendMessage(plugin.translateMessage("BARREL_OPERATION_PERMISSION"));
+                    }
                     break;
                 case INFO :
                     double stacksUsed = Math.ceil((double) barrel.getAmount() / (double) barrel.getMaxStackSize());
@@ -440,7 +464,7 @@ public class BarrelManager implements Listener {
     }
 
     public enum BarrelOperation {
-        LOCK, UNLOCK, INFO
+        LOCK, UNLOCK, INFO, ITEMLOCK, ITEMUNLOCK
     }
     private class PendingItemFrameData {
         private Barrel barrel;

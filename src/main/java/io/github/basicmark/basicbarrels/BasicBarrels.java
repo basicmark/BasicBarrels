@@ -194,6 +194,10 @@ public class BasicBarrels extends JavaPlugin {
 			if ((args.length == 1) && (args[0].equals("?") || args[0].equals("help"))) {
                 sender.sendMessage(translateMessage("HELP_TITLE1"));
                 sender.sendMessage(translateMessage("HELP_TITLE2"));
+                if (sender.hasPermission("barrel.player.use")) {
+                    sender.sendMessage(translateMessage("HELP_ITEMLOCK"));
+                    sender.sendMessage(translateMessage("HELP_ITEMUNLOCK"));
+                }
                 if (sender.hasPermission("barrel.player.unlock")) {
                     sender.sendMessage(translateMessage("HELP_UNLOCK"));
                 }
@@ -239,7 +243,33 @@ public class BasicBarrels extends JavaPlugin {
                 barrelManager.setPendingRequest(player, BarrelManager.BarrelOperation.LOCK);
                 sender.sendMessage(translateMessage("OPERATION_LOCK"));
 				return true;	
-			} else if ((args.length == 1) && args[0].equals("info")) {
+			} else if ((args.length == 1) && args[0].equals("itemlock")) {
+                if (!sender.hasPermission("barrel.player.use")) {
+                    sender.sendMessage(translateMessage("COMMAND_PERMISSION_ERROR"));
+                    return true;
+                }
+                if (!(sender instanceof Player)) {
+                    sender.sendMessage(translateMessage("COMMAND_CONSOLE_SENDER_ERROR"));
+                    return true;
+                }
+                Player player = (Player) sender;
+                barrelManager.setPendingRequest(player, BarrelManager.BarrelOperation.ITEMLOCK);
+                sender.sendMessage(translateMessage("OPERATION_ITEMLOCK"));
+                return true;
+            } else if ((args.length == 1) && args[0].equals("itemunlock")) {
+                if (!sender.hasPermission("barrel.player.use")) {
+                    sender.sendMessage(translateMessage("COMMAND_PERMISSION_ERROR"));
+                    return true;
+                }
+                if (!(sender instanceof Player)) {
+                    sender.sendMessage(translateMessage("COMMAND_CONSOLE_SENDER_ERROR"));
+                    return true;
+                }
+                Player player = (Player) sender;
+                barrelManager.setPendingRequest(player, BarrelManager.BarrelOperation.ITEMUNLOCK);
+                sender.sendMessage(translateMessage("OPERATION_UNITEMLOCK"));
+                return true;
+            } else if ((args.length == 1) && args[0].equals("info")) {
                 if (!sender.hasPermission("barrel.player.info")) {
                     sender.sendMessage(translateMessage("COMMAND_PERMISSION_ERROR"));
                     return true;

@@ -78,6 +78,9 @@ public class Barrel extends BarrelConduit {
     /* Added to save state in version 2 */
     private boolean locked;
 
+    /* Added to save state in version 3 */
+    private boolean itemLocked;
+
     static {
         empty = new ItemStack(Material.BARRIER);
         ItemMeta meta = empty.getItemMeta();
@@ -97,6 +100,7 @@ public class Barrel extends BarrelConduit {
         this.type = BarrelType.fromName(barrelItem.getItemMeta().getLore().get(1));
         this.material = barrelItem.getType();
         this.blockData = barrelItem.getData().getData();
+        this.itemLocked = false;
 
         /* Create the barrel */
         Block block = getBukkitBlock();
@@ -149,11 +153,10 @@ public class Barrel extends BarrelConduit {
             item = null;
         }
 
-        if (loadVersion >= 2) {
-            locked = config.getBoolean("locked", true);
-        } else {
-            locked = true;
-        }
+        /* Version >= 2 settings */
+        locked = config.getBoolean("locked", true);
+        /* Version >= 3 settings */
+        itemLocked = config.getBoolean("itemlocked", false);
 
         itemFrameUUID = UUID.fromString(config.getString("itemframe"));
         Collection<ItemFrame> entities = getBukkitBlock().getWorld().getEntitiesByClass​(ItemFrame.class);
@@ -351,7 +354,7 @@ public class Barrel extends BarrelConduit {
                     BasicBarrels.getBarrelManager().registerDeferredItemFrameLoad(this, chunkLocationSet);
                 }
             } else {
-                if (amount == 0) {
+                if (amount == 0 && (!itemLocked)) {
                     itemFrame.setItem(empty.clone());
                 } else {
                     Integer stackSize = item.getMaxStackSize();
@@ -385,6 +388,16 @@ public class Barrel extends BarrelConduit {
             itemFrame.removeMetadata(metadataKey, BarrelManager.plugin);
             itemFrame.getLocation().getBlock().removeMetadata(metadataKey, BarrelManager.plugin);
         }
+    }
+
+    private boolean isAccepting(ItemStack item) {
+        if (!isStoreable(item)) {
+            return false;
+        }
+        if (itemLocked && (!matchsBarrelItem(item))) {
+            return false;
+        }
+        return true;
     }
 
     public boolean hasPermission(Player player) {
@@ -491,6 +504,14 @@ public class Barrel extends BarrelConduit {
         locked = false;
     }
 
+    public void itemLock() {
+        itemLocked = true;
+    }
+
+    public void itemUnlock() {
+        itemLocked = false;
+    }
+
     public boolean addItemsFromInventory(Inventory inventory, int firstSlot, int lastSlot, int addAmount) throws BarrelException {
         int beforeAmount = this.amount;
 
@@ -505,7 +526,7 @@ public class Barrel extends BarrelConduit {
          * is true for barrels whose content has already been set.
          */
         if (amount == 0) {
-            if (!isStoreable(inventory.getItem(firstSlot))) {
+            if (!isAccepting(inventory.getItem(firstSlot))) {
                 return true;
             }
 
